@@ -1,6 +1,8 @@
 @tool
 extends Panel
-class_name ConsoleAndTextchat
+class_name TextChat
+
+signal message_sent
 
 ## NODE DEPENDENCIES ##
 @onready var text_input_line: LineEdit
@@ -16,7 +18,7 @@ enum text_input_line_modes {
 @onready var text_input_line_mode: int = text_input_line_modes.DEFAULT:
 	set(new_mode):
 		
-		print(new_mode, text_input_line_mode)
+		#print(new_mode, text_input_line_mode)
 		if new_mode == text_input_line_mode:
 			return
 		text_input_line_mode = new_mode
@@ -40,15 +42,19 @@ enum text_input_line_modes {
 @export var override_theme_colors: bool = true
 @export var history_preview_color: Color = Color.SALMON
 @export var disable_text_input_line: bool = false
-@export var disable_key_enter_focus: bool = false
-
+@export var keep_focus_after_message = false
+@export var default_preview_text = "Press 'enter' to send a message"
+@export var enable_bbcode = true
+@export var message_pretext = "" # used to set 
+@export_category("Text history settings")
+@export var disable_command_history = false
+@export var save_only_commands = true
 
 ####################################################################################################
 ## STARTUP ##
 
-
 func _ready():
-	_build_console()
+	_build_chat()
 	set("minimum_size", size)
 	_register_premade_commands()
 	_handle_text_input_line_themes()
@@ -56,7 +62,7 @@ func _ready():
 	resized.connect(_on_text_window_resized)
 
 
-func _build_console() -> void:
+func _build_chat() -> void:
 	_format_panel()
 	_instance_and_setup_children()
 
@@ -78,7 +84,7 @@ func _instance_and_setup_chat_window(parent: VBoxContainer) -> void:
 	var display: RichTextLabel = RichTextLabel.new()
 	display.name = "DisplayLabel"
 	#display.custom_minimum_size = Vector2(300,300)
-	display.bbcode_enabled = true
+	display.bbcode_enabled = enable_bbcode
 	display.scroll_active = true
 	display.scroll_following = true
 	display.clip_contents = false
@@ -92,7 +98,7 @@ func _instance_and_setup_text_input(parent: VBoxContainer) -> void:
 	var edit: LineEdit = LineEdit.new()
 	edit.name = "TextInputLine"
 	edit.custom_minimum_size = Vector2(300, 35)
-	edit.placeholder_text = "Insert message or command"
+	edit.placeholder_text = default_preview_text
 	edit.text_submitted.connect(_on_text_input_line_text_submitted.bind())
 
 	parent.add_child(edit)
@@ -115,7 +121,7 @@ func _on_missing_command_arguments() -> void:
 	print_message(col(Color.ORANGE_RED, "Error, missing arguments for command!"))
 
 
-func clear_console() -> void:
+func clear_chat() -> void:
 	display_label.text = ""
 
 
@@ -124,58 +130,63 @@ func clear_console() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	#toggle console visibility
-	if event is InputEventKey and !text_input_line.has_focus():
-		if event.pressed == true and event.physical_keycode == KEY_K:
-			_toggle_console_visibility()
+	# toggle chat visibility
+	if event.is_action_pressed("chat_toggle_visibility") and !text_input_line.has_focus():
+		toggle_chat_visibility()
 
-	#grab focus of text input line
-	if event is InputEventKey:
-		if event.pressed == true and not disable_key_enter_focus and event.physical_keycode == KEY_ENTER \
-		and self.visible and !text_input_line.has_focus():
-			text_input_line.grab_focus()
+	# grab focus of text input line
+	if event.is_action_pressed("chat_activate") \
+	and self.visible and !text_input_line.has_focus():
+		text_input_line.grab_focus()
+	
+	if event.is_action_pressed("chat_deactivate") \
+	and self.visible:
+		text_input_line.release_focus()
 
-	# navigate command history with Shift + Arrow keys
-	if event is InputEventKey and text_input_line.has_focus():
-		if event.shift_pressed and event.pressed:
-			if event.physical_keycode == KEY_UP:
-				_show_previous_command()
-			elif event.physical_keycode == KEY_DOWN:
-				_show_next_command()
-
+	# navigate chat history
+	if text_input_line.has_focus() and not disable_command_history:
+		if event.is_action_pressed("chat_show_previous_command"):
+			_show_previous_command()
+		elif event.is_action_pressed("chat_show_next_command"):
+			_show_next_command()
 
 func _on_text_input_line_text_submitted(new_text: String) -> void:
 	if new_text == "":
 		return
-	_save_text_to_history(new_text)
+	
+	if save_only_commands and new_text.begins_with("/"):
+		_save_text_to_history(new_text)
+	elif not save_only_commands:
+		_save_text_to_history(new_text)
+	
 	if _input_is_command(new_text):
 		_proceed_command(new_text)
 	else:
+		new_text = message_pretext + new_text
 		print_message(new_text)
-
 	_clear_text_input_line_text()
+	
+	if not keep_focus_after_message:
+		text_input_line.release_focus()
+	
+	message_sent.emit()
 
 
 ####################################################################################################
 ## COMMAND HISTORY ##
 
-
 func _save_text_to_history(command: String) -> void:
 	command_history.append(command)
 	command_history_index = -1  # Reset index
 
-
 func _show_previous_command() -> void:
 	if command_history.size() == 0:
 		return
-
 	if command_history_index == -1:
 		command_history_index = command_history.size() - 1
 	elif command_history_index > 0:
 		command_history_index -= 1
-
 	_set_preview_text(command_history[command_history_index])
-
 
 func _show_next_command() -> void:
 	if command_history.size() == 0:
@@ -209,7 +220,6 @@ func _clear_text_input_line_text() -> void:
 ####################################################################################################
 ## COMMANDS LOGIC##
 
-
 func register_command(command_name: String, function: Callable, arguments: bool = true) -> void:
 	var blank_command: Dictionary = {
 										"command_name": command_name,
@@ -226,13 +236,11 @@ func delete_command(command_name: String) -> void:
 			all_commands.remove_at(command_dic_index)
 			return
 
-
 func _input_is_command(text: String) -> bool:
 	if text.begins_with("/"):
 		return true
 	else:
 		return false
-
 
 func _proceed_command(text: String) -> void:
 	text = text.erase(0, 1) #remove /
@@ -259,8 +267,8 @@ func _proceed_command(text: String) -> void:
 
 func _register_premade_commands() -> void:
 	register_command("help", _help_command, false)
-	register_command("toggle_console", _toggle_console_visibility, false)
-	register_command("clear", clear_console, false)
+	#register_command("toggle_chat", toggle_chat_visibility, false)
+	register_command("clear", clear_chat, false)
 
 
 ################################################################################
@@ -362,7 +370,7 @@ func _help_command() -> void:
 		print_message(col(Color.BLANCHED_ALMOND, "/" + command_dic["command_name"]))
 
 
-func _toggle_console_visibility() -> void:
+func toggle_chat_visibility() -> void:
 	if self.visible:
 		self.hide()
 		return
@@ -381,4 +389,3 @@ func _handle_text_input_line_visibility() -> void:
 		text_input_line.hide()
 	else:
 		text_input_line.show()
-
