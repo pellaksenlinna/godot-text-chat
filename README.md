@@ -27,7 +27,6 @@ See [Installing a plugin](https://docs.godotengine.org/en/stable/tutorials/plugi
 
 Add the "ConsoleAndTextchat" node to your scene tree. Adjust positioning and size in the scene.
 
-![Scene Tree](https://raw.githubusercontent.com/Mike-Bros/ConsoleAddon/main/screenshots/Scene_tree.PNG)
 
 ### Printing messages to the console
 
