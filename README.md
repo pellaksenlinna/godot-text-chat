@@ -1,24 +1,25 @@
-# Console and Textchat Addon
+# TextChat -addon
 
 ## Purpose
 
-This addon includes a custom node which can represent a console and textchat.
-You can print messages in game to the console to help you debug or register commands for debugging.
+This addon includes a custom TextChat node.
 
-![Demo 2](https://raw.githubusercontent.com/Mike-Bros/ConsoleAddon/main/screenshots/demo2.png)
+It is based on [this addon](https://github.com/KeilainMan/ConsoleAddon) made by [@KeilainMan](https://github.com/KeilainMan).
+
+**This README is not up-to-date** as **this repo is a fork** and **I'm not yet planning to write a new, accurate README**.
 
 ## Features
 
-[x] Usable as textchat
-[x] Usable as a simple console for your game
-[x] Simple debugging through custom cheatcodes
+[x] Send & receive chat messages
+[x] Supports commands
+[x] Customizable
+[ ] Private chat
+[ ] Built-in networking support via MultiplayerSynchronizer
 [x] Text History
-[x] Textstyling through code
-[x] Customization settings
 
 ## Installation
 
-[Install via Godot AssetLib](https://godotengine.org/asset-library/asset/2946) and enable plugin in project settings.
+[Install via Godot AssetLib](https://godotengine.org/asset-library/asset/2946) and enable plugin in project settings. (NOTE
 
 See [Installing a plugin](https://docs.godotengine.org/en/stable/tutorials/plugins/editor/installing_plugins.html#installing-a-plugin) from the Godot docs for further assistance.
 
